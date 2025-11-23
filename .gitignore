@@ -14,3 +14,11 @@
 /storage/framework/sessions
 /storage/framework/views
 /storage/logs
+
+# Laravel Boost generated artifacts
+.mcp.json
+AGENTS.md
+CLAUDE.md
+boost.json
+junie/
+.github/copilot-instructions.md

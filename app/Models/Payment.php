@@ -15,16 +15,14 @@ class Payment extends Model
     protected $fillable = [
         'business_id',
         'invoice_id',
-        'payment_date',
         'amount',
-        'mode',
-        'reference_no',
+        'paid_at',
+        'method',
         'notes',
-        'created_by',
     ];
 
     protected $casts = [
-        'payment_date' => 'date',
+        'paid_at' => 'datetime',
     ];
 
     public function business()

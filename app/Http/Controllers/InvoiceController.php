@@ -11,6 +11,7 @@ use Illuminate\Support\Str;
 
 /**
  * Controller for managing invoices.
+ * SSR alignment: tenant-scoped invoices with validated CRUD, numbering, and PDF/email hooks per SSR specs.
  */
 class InvoiceController extends Controller
 {
@@ -19,7 +20,7 @@ class InvoiceController extends Controller
      */
     public function index()
     {
-        $business = Auth::user()->businesses->first();
+        $business = Auth::user()->business;
         $invoices = Invoice::where('business_id', $business->id)->orderByDesc('invoice_date')->paginate(20);
         return view('invoices.index', compact('invoices'));
     }
@@ -29,7 +30,7 @@ class InvoiceController extends Controller
      */
     public function create()
     {
-        $business = Auth::user()->businesses->first();
+        $business = Auth::user()->business;
         $customers = Customer::where('business_id', $business->id)->get();
         return view('invoices.create', compact('customers'));
     }
@@ -39,10 +40,18 @@ class InvoiceController extends Controller
      */
     public function store(Request $request)
     {
-        $business = Auth::user()->businesses->first();
-        $data = $request->all();
+        $business = Auth::user()->business;
+        $data = $request->validate([
+            'customer_id' => ['required', 'integer'],
+            'invoice_date' => ['required', 'date'],
+            'due_date' => ['nullable', 'date'],
+            'notes' => ['nullable', 'string'],
+            'terms' => ['nullable', 'string'],
+        ]);
+
         $data['business_id'] = $business->id;
-        $data['invoice_number'] = $business->default_invoice_prefix . str_pad($business->next_invoice_number, 4, '0', STR_PAD_LEFT);
+        $data['currency'] = $business->currency ?? 'INR';
+        $data['invoice_number'] = ($business->invoice_prefix ?? 'INV-') . str_pad($business->invoice_start_no ?? 1, 4, '0', STR_PAD_LEFT);
         $data['public_hash'] = Str::random(40);
         $data['created_by'] = Auth::id();
         $invoice = Invoice::create($data);
@@ -70,8 +79,9 @@ class InvoiceController extends Controller
         $invoice->grand_total = $subtotal;
         $invoice->amount_due  = $subtotal;
         $invoice->save();
+
         // increment invoice number
-        $business->next_invoice_number += 1;
+        $business->invoice_start_no = ($business->invoice_start_no ?? 1) + 1;
         $business->save();
         return redirect()->route('invoices.show', $invoice)->with('success', 'Invoice created successfully');
     }
@@ -81,6 +91,7 @@ class InvoiceController extends Controller
      */
     public function show(Invoice $invoice)
     {
+        $this->authorizeInvoice($invoice);
         return view('invoices.show', compact('invoice'));
     }
 
@@ -89,7 +100,8 @@ class InvoiceController extends Controller
      */
     public function edit(Invoice $invoice)
     {
-        $business = Auth::user()->businesses->first();
+        $this->authorizeInvoice($invoice);
+        $business = Auth::user()->business;
         $customers = Customer::where('business_id', $business->id)->get();
         return view('invoices.edit', compact('invoice', 'customers'));
     }
@@ -99,7 +111,16 @@ class InvoiceController extends Controller
      */
     public function update(Request $request, Invoice $invoice)
     {
-        $invoice->update($request->all());
+        $this->authorizeInvoice($invoice);
+        $data = $request->validate([
+            'customer_id' => ['required', 'integer'],
+            'invoice_date' => ['required', 'date'],
+            'due_date' => ['nullable', 'date'],
+            'notes' => ['nullable', 'string'],
+            'terms' => ['nullable', 'string'],
+        ]);
+
+        $invoice->update($data);
         // update items (simple: delete and recreate)
         $invoice->items()->delete();
         $subtotal = 0;
@@ -132,6 +153,7 @@ class InvoiceController extends Controller
      */
     public function destroy(Invoice $invoice)
     {
+        $this->authorizeInvoice($invoice);
         $invoice->delete();
         return redirect()->route('invoices.index')->with('success', 'Invoice deleted successfully');
     }
@@ -141,6 +163,7 @@ class InvoiceController extends Controller
      */
     public function downloadPdf(Invoice $invoice)
     {
+        $this->authorizeInvoice($invoice);
         $template = $invoice->template_key ?? $invoice->business->default_template_key ?? 'classic_detailed';
         $view = match ($template) {
             'classic_detailed' => 'invoices.templates.classic_detailed',
@@ -155,7 +178,17 @@ class InvoiceController extends Controller
      */
     public function sendEmail(Invoice $invoice)
     {
+        $this->authorizeInvoice($invoice);
         // send email logic here
         return redirect()->back()->with('success', 'Email sent successfully');
+    }
+
+    protected function authorizeInvoice(Invoice $invoice): void
+    {
+        $business = Auth::user()->business;
+
+        if ($invoice->business_id !== $business?->id) {
+            abort(403);
+        }
     }
 }

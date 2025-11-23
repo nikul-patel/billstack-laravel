@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Auth;
 
 /**
  * Controller for managing products/services (items).
+ * SSR alignment: tenant-scoped CRUD with validation, respecting business_id per SSR requirements.
  */
 class ItemController extends Controller
 {
@@ -16,7 +17,7 @@ class ItemController extends Controller
      */
     public function index()
     {
-        $business = Auth::user()->businesses->first();
+        $business = Auth::user()->business;
         $items = Item::where('business_id', $business->id)->paginate(20);
         return view('items.index', compact('items'));
     }
@@ -34,8 +35,16 @@ class ItemController extends Controller
      */
     public function store(Request $request)
     {
-        $business = Auth::user()->businesses->first();
-        $data = $request->all();
+        $business = Auth::user()->business;
+
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
+            'price' => ['required', 'numeric'],
+            'tax_rate' => ['nullable', 'numeric'],
+            'unit' => ['nullable', 'string', 'max:50'],
+        ]);
+
         $data['business_id'] = $business->id;
         Item::create($data);
         return redirect()->route('items.index')->with('success', 'Item created successfully');
@@ -54,7 +63,17 @@ class ItemController extends Controller
      */
     public function update(Request $request, Item $item)
     {
-        $item->update($request->all());
+        $this->authorizeItem($item);
+
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
+            'price' => ['required', 'numeric'],
+            'tax_rate' => ['nullable', 'numeric'],
+            'unit' => ['nullable', 'string', 'max:50'],
+        ]);
+
+        $item->update($data);
         return redirect()->route('items.index')->with('success', 'Item updated successfully');
     }
 
@@ -63,7 +82,17 @@ class ItemController extends Controller
      */
     public function destroy(Item $item)
     {
+        $this->authorizeItem($item);
         $item->delete();
         return redirect()->route('items.index')->with('success', 'Item deleted successfully');
+    }
+
+    protected function authorizeItem(Item $item): void
+    {
+        $business = Auth::user()->business;
+
+        if ($item->business_id !== $business?->id) {
+            abort(403);
+        }
     }
 }

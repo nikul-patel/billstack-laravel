@@ -16,7 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
             // Global middleware
             \App\Http\Middleware\TrustHosts::class,
             \App\Http\Middleware\TrustProxies::class,
-            \Fruitcake\Cors\HandleCors::class,
+            \Illuminate\Http\Middleware\HandleCors::class,
             \App\Http\Middleware\PreventRequestsDuringMaintenance::class,
             \Illuminate\Foundation\Http\Middleware\ValidatePostSize::class,
             \App\Http\Middleware\TrimStrings::class,
@@ -49,6 +49,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'signed' => \App\Http\Middleware\ValidateSignature::class,
             'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
             'verified' => \Illuminate\Auth\Middleware\EnsureEmailIsVerified::class,
+            'business.setup' => \App\Http\Middleware\CheckBusinessSetup::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {

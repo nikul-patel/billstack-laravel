@@ -14,12 +14,11 @@ class RecurringProfileItem extends Model
 
     protected $fillable = [
         'recurring_profile_id',
-        'item_id',
-        'name',
         'description',
-        'rate',
         'quantity',
-        'tax_percent',
+        'name',
+        'rate',
+        'tax_rate',
         'sort_order',
     ];
 

@@ -8,6 +8,8 @@ use App\Http\Controllers\RecurringProfileController;
 use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\Reports\InvoiceReportController;
+use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\OnboardingController;
 
 Route::get('/', function () {
     return view('welcome');
@@ -24,7 +26,24 @@ Route::get('/', function () {
 |
 */
 
-Route::middleware('auth')->group(function () {
+Route::middleware('guest')->group(function () {
+    Route::get('login', [LoginController::class, 'create'])->name('login');
+    Route::post('login', [LoginController::class, 'store'])->name('login.store');
+});
+
+Route::post('logout', [LoginController::class, 'destroy'])
+    ->middleware('auth')
+    ->name('logout');
+
+Route::middleware(['auth', 'business.setup'])->group(function () {
+    // Onboarding
+    Route::get('onboarding/step-1', [OnboardingController::class, 'step1'])->name('onboarding.step1');
+    Route::post('onboarding/step-1', [OnboardingController::class, 'step1Store'])->name('onboarding.step1.store');
+    Route::get('onboarding/step-2', [OnboardingController::class, 'step2'])->name('onboarding.step2');
+    Route::post('onboarding/step-2', [OnboardingController::class, 'step2Store'])->name('onboarding.step2.store');
+    Route::get('onboarding/review', [OnboardingController::class, 'review'])->name('onboarding.review');
+    Route::post('onboarding/complete', [OnboardingController::class, 'complete'])->name('onboarding.complete');
+
     // Dashboard
     Route::get('/dashboard', [BusinessController::class, 'dashboard'])->name('dashboard');
 

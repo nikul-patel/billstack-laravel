@@ -16,18 +16,15 @@ class RecurringProfile extends Model
         'business_id',
         'customer_id',
         'name',
-        'billing_frequency',
-        'billing_day_of_month',
-        'start_date',
-        'end_date',
-        'is_active',
+        'frequency',
+        'next_run_date',
+        'day_of_month',
+        'amount',
         'notes',
     ];
 
     protected $casts = [
-        'is_active' => 'boolean',
-        'start_date' => 'date',
-        'end_date' => 'date',
+        'next_run_date' => 'date',
     ];
 
     public function business()

@@ -17,7 +17,7 @@ class InvoiceReportController extends Controller
      */
     public function index(Request $request)
     {
-        $business = Auth::user()->businesses->first();
+        $business = Auth::user()->business;
         $query = Invoice::where('business_id', $business->id);
         if ($request->filled('status')) {
             $query->where('status', $request->input('status'));

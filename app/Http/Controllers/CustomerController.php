@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Auth;
 
 /**
  * Controller for managing customers.
+ * SSR alignment: multi-tenant isolation via business_id, scoped queries, and validated CRUD per sprint1/basic/detailed SSR docs.
  */
 class CustomerController extends Controller
 {
@@ -16,7 +17,7 @@ class CustomerController extends Controller
      */
     public function index()
     {
-        $business = Auth::user()->businesses->first();
+        $business = Auth::user()->business;
         $customers = Customer::where('business_id', $business->id)->paginate(20);
         return view('customers.index', compact('customers'));
     }
@@ -34,9 +35,27 @@ class CustomerController extends Controller
      */
     public function store(Request $request)
     {
-        $business = Auth::user()->businesses->first();
-        $data = $request->all();
+        $business = Auth::user()->business;
+
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'contact_person' => ['nullable', 'string', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:50'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'billing_address_line_1' => ['nullable', 'string', 'max:255'],
+            'billing_address_line_2' => ['nullable', 'string', 'max:255'],
+            'city' => ['nullable', 'string', 'max:255'],
+            'state' => ['nullable', 'string', 'max:255'],
+            'pincode' => ['nullable', 'string', 'max:20'],
+            'country' => ['nullable', 'string', 'max:255'],
+            'gstin' => ['nullable', 'string', 'max:50'],
+            'opening_balance' => ['nullable', 'numeric'],
+            'notes' => ['nullable', 'string'],
+            'default_template_key' => ['nullable', 'string', 'max:50'],
+        ]);
+
         $data['business_id'] = $business->id;
+
         Customer::create($data);
         return redirect()->route('customers.index')->with('success', 'Customer created successfully');
     }
@@ -54,7 +73,26 @@ class CustomerController extends Controller
      */
     public function update(Request $request, Customer $customer)
     {
-        $customer->update($request->all());
+        $this->authorizeCustomer($customer);
+
+        $data = $request->validate([
+            'name' => ['required', 'string', 'max:255'],
+            'contact_person' => ['nullable', 'string', 'max:255'],
+            'phone' => ['nullable', 'string', 'max:50'],
+            'email' => ['nullable', 'email', 'max:255'],
+            'billing_address_line_1' => ['nullable', 'string', 'max:255'],
+            'billing_address_line_2' => ['nullable', 'string', 'max:255'],
+            'city' => ['nullable', 'string', 'max:255'],
+            'state' => ['nullable', 'string', 'max:255'],
+            'pincode' => ['nullable', 'string', 'max:20'],
+            'country' => ['nullable', 'string', 'max:255'],
+            'gstin' => ['nullable', 'string', 'max:50'],
+            'opening_balance' => ['nullable', 'numeric'],
+            'notes' => ['nullable', 'string'],
+            'default_template_key' => ['nullable', 'string', 'max:50'],
+        ]);
+
+        $customer->update($data);
         return redirect()->route('customers.index')->with('success', 'Customer updated successfully');
     }
 
@@ -63,7 +101,17 @@ class CustomerController extends Controller
      */
     public function destroy(Customer $customer)
     {
+        $this->authorizeCustomer($customer);
         $customer->delete();
         return redirect()->route('customers.index')->with('success', 'Customer deleted successfully');
+    }
+
+    protected function authorizeCustomer(Customer $customer): void
+    {
+        $business = Auth::user()->business;
+
+        if ($customer->business_id !== $business?->id) {
+            abort(403);
+        }
     }
 }

@@ -12,6 +12,7 @@ use Illuminate\Support\Str;
 
 /**
  * Controller for managing recurring billing profiles.
+ * SSR alignment: tenant-scoped recurring billing, validated inputs, and invoice generation hooks.
  */
 class RecurringProfileController extends Controller
 {
@@ -20,7 +21,7 @@ class RecurringProfileController extends Controller
      */
     public function index()
     {
-        $business = Auth::user()->businesses->first();
+        $business = Auth::user()->business;
         $profiles = RecurringProfile::where('business_id', $business->id)->paginate(20);
         return view('recurring-profiles.index', compact('profiles'));
     }
@@ -38,15 +39,31 @@ class RecurringProfileController extends Controller
      */
     public function store(Request $request)
     {
-        $business = Auth::user()->businesses->first();
-        $data = $request->all();
+        $business = Auth::user()->business;
+
+        $data = $request->validate([
+            'customer_id' => ['required', 'integer'],
+            'name' => ['nullable', 'string', 'max:255'],
+            'frequency' => ['required', 'string', 'max:50'],
+            'next_run_date' => ['nullable', 'date'],
+            'day_of_month' => ['nullable', 'integer', 'between:1,31'],
+            'amount' => ['nullable', 'numeric'],
+            'notes' => ['nullable', 'string'],
+        ]);
         $data['business_id'] = $business->id;
         $profile = RecurringProfile::create($data);
         // Items creation (if present)
         if ($request->has('items')) {
             foreach ($request->input('items') as $item) {
-                $item['recurring_profile_id'] = $profile->id;
-                RecurringProfileItem::create($item);
+                RecurringProfileItem::create([
+                    'recurring_profile_id' => $profile->id,
+                    'name' => $item['name'] ?? null,
+                    'description' => $item['description'] ?? null,
+                    'rate' => $item['rate'] ?? 0,
+                    'quantity' => $item['quantity'] ?? 1,
+                    'tax_rate' => $item['tax_rate'] ?? 0,
+                    'sort_order' => $item['sort_order'] ?? 0,
+                ]);
             }
         }
         return redirect()->route('recurring-profiles.index')->with('success', 'Recurring profile created successfully');
@@ -65,13 +82,32 @@ class RecurringProfileController extends Controller
      */
     public function update(Request $request, RecurringProfile $recurring_profile)
     {
-        $recurring_profile->update($request->all());
+        $this->authorizeProfile($recurring_profile);
+
+        $data = $request->validate([
+            'customer_id' => ['required', 'integer'],
+            'name' => ['nullable', 'string', 'max:255'],
+            'frequency' => ['required', 'string', 'max:50'],
+            'next_run_date' => ['nullable', 'date'],
+            'day_of_month' => ['nullable', 'integer', 'between:1,31'],
+            'amount' => ['nullable', 'numeric'],
+            'notes' => ['nullable', 'string'],
+        ]);
+
+        $recurring_profile->update($data);
         // Update items (simplified: delete and recreate)
         $recurring_profile->items()->delete();
         if ($request->has('items')) {
             foreach ($request->input('items') as $item) {
-                $item['recurring_profile_id'] = $recurring_profile->id;
-                RecurringProfileItem::create($item);
+                RecurringProfileItem::create([
+                    'recurring_profile_id' => $recurring_profile->id,
+                    'name' => $item['name'] ?? null,
+                    'description' => $item['description'] ?? null,
+                    'rate' => $item['rate'] ?? 0,
+                    'quantity' => $item['quantity'] ?? 1,
+                    'tax_rate' => $item['tax_rate'] ?? 0,
+                    'sort_order' => $item['sort_order'] ?? 0,
+                ]);
             }
         }
         return redirect()->route('recurring-profiles.index')->with('success', 'Recurring profile updated successfully');
@@ -82,6 +118,7 @@ class RecurringProfileController extends Controller
      */
     public function destroy(RecurringProfile $recurring_profile)
     {
+        $this->authorizeProfile($recurring_profile);
         $recurring_profile->delete();
         return redirect()->route('recurring-profiles.index')->with('success', 'Recurring profile deleted successfully');
     }
@@ -91,16 +128,17 @@ class RecurringProfileController extends Controller
      */
     public function generateInvoices(RecurringProfile $profile, Request $request)
     {
-        $business = Auth::user()->businesses->first();
+        $this->authorizeProfile($profile);
+        $business = Auth::user()->business;
         // Example: create a single invoice for this profile's customer
         $invoice = Invoice::create([
             'business_id'    => $business->id,
             'customer_id'    => $profile->customer_id,
-            'invoice_number' => $business->default_invoice_prefix . str_pad($business->next_invoice_number, 4, '0', STR_PAD_LEFT),
+            'invoice_number' => ($business->invoice_prefix ?? 'INV-') . str_pad($business->invoice_start_no ?? 1, 4, '0', STR_PAD_LEFT),
             'invoice_date'   => now(),
-            'due_date'       => now()->addDays($business->default_due_days),
+            'due_date'       => now()->addDays(7),
             'status'         => 'draft',
-            'currency'       => $business->default_currency,
+            'currency'       => $business->currency ?? 'INR',
             'subtotal'       => 0,
             'discount_type'  => 'none',
             'discount_value' => 0,
@@ -128,13 +166,23 @@ class RecurringProfileController extends Controller
             $lineTotal += $item->rate * $item->quantity;
         }
         // update totals
-        $invoice->subtotal  = $lineTotal;
+        $invoice->subtotal = $lineTotal;
         $invoice->grand_total = $lineTotal;
-        $invoice->amount_due  = $lineTotal;
+        $invoice->amount_due = $lineTotal;
         $invoice->save();
-        // increment business invoice number
-        $business->next_invoice_number += 1;
+
+        // increment business invoice numbering
+        $business->invoice_start_no = ($business->invoice_start_no ?? 1) + 1;
         $business->save();
         return redirect()->route('invoices.edit', $invoice)->with('success', 'Invoice generated from recurring profile');
+    }
+
+    protected function authorizeProfile(RecurringProfile $profile): void
+    {
+        $business = Auth::user()->business;
+
+        if ($profile->business_id !== $business?->id) {
+            abort(403);
+        }
     }
 }

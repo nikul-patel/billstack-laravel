@@ -15,11 +15,9 @@ class Item extends Model
     protected $fillable = [
         'business_id',
         'name',
-        'code',
-        'type',
         'unit',
-        'rate',
-        'tax_percent',
+        'price',
+        'tax_rate',
         'description',
     ];
 
