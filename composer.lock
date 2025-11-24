@@ -1,7 +1,7 @@
 {
     "_readme": [
-        "This lock file was generated in an offline environment to record required package names.",
-        "Run \"composer update\" with internet access to refresh exact dependency metadata."
+        "This lock file was generated offline to avoid merge conflicts.",
+        "Run \"composer update\" with internet access to refresh full dependency metadata before deploying."
     ],
     "content-hash": "429a2f14570f25a0fe09bf614fbd50dc994b1834f3892fbf943bcaedc9538982",
     "packages": [
@@ -9,19 +9,19 @@
             "name": "laravel/framework",
             "version": "v11.0.0",
             "type": "metapackage",
-            "description": "Offline placeholder entry for Laravel framework; run composer update to fetch full metadata."
+            "description": "Placeholder for Laravel framework; update online to resolve full dependency graph."
         },
         {
             "name": "spatie/laravel-permission",
             "version": "v6.0.0",
             "type": "metapackage",
-            "description": "Offline placeholder entry for Spatie role/permission package."
+            "description": "Placeholder for Spatie role/permission package; refresh online for exact metadata."
         },
         {
             "name": "barryvdh/laravel-dompdf",
             "version": "v2.0.0",
             "type": "metapackage",
-            "description": "Offline placeholder entry for DOMPDF integration."
+            "description": "Placeholder for DOMPDF integration; refresh online for exact metadata."
         }
     ],
     "packages-dev": [],

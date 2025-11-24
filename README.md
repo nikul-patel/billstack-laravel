@@ -7,7 +7,6 @@ This repository contains a Laravel‑based invoicing and billing system designed
 - **Multi‑tenant** business accounts with support for multiple users and roles.
 - Customer, product/service and recurring profile management.
 - Manual and recurring invoice generation with customizable templates, including a classic detailed format.
- - Manual and recurring invoice generation with customizable templates, including a **Classic Detailed Format** matching the sample invoice layout.
 - Payment tracking and outstanding balance reports.
 - Simple dashboard and basic financial reports.
 
