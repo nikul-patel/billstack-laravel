@@ -1,0 +1,6 @@
+{
+  "name": "nightwatch",
+  "version": "0.0.0",
+  "description": "Local placeholder Nightwatch package for offline installs.",
+  "main": "index.js"
+}
