@@ -15,10 +15,11 @@ This repository contains a Laravel‑based invoicing and billing system designed
 
 This project follows a standard Laravel structure. To set it up locally:
 
-1. Ensure you have PHP 8.1+, Composer and a database (MySQL or PostgreSQL) available.
+1. Ensure you have PHP 8.3+, Composer and a database (MySQL or PostgreSQL) available.
 2. Clone the repository and install dependencies:
 
    ```bash
+   # Install dependencies (regenerates composer.lock with the correct versions)
    composer install
    cp .env.example .env
    php artisan key:generate
