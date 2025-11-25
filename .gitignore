@@ -30,3 +30,6 @@ CLAUDE.md
 boost.json
 junie/
 .github/copilot-instructions.md
+/bootstrap/cache/*.php
+/bootstrap/cache/*.json
+!/bootstrap/cache/.gitignore
