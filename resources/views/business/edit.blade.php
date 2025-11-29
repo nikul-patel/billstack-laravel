@@ -31,7 +31,7 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium">Invoice Prefix</label>
-                    <input type="text" name="invoice_prefix" value="{{ old('invoice_prefix', $business->invoice_prefix ?? 'INV-') }}" class="mt-1 w-full border rounded px-3 py-2">
+                    <input type="text" name="invoice_prefix" value="{{ old('invoice_prefix', $business->invoice_prefix ?? '') }}" class="mt-1 w-full border rounded px-3 py-2" placeholder="Optional">
                 </div>
                 <div>
                     <label class="block text-sm font-medium">Invoice Start No</label>
@@ -53,6 +53,10 @@
             <div>
                 <label class="block text-sm font-medium">Address</label>
                 <textarea name="address" rows="3" class="mt-1 w-full border rounded px-3 py-2">{{ old('address', $business->address ?? '') }}</textarea>
+            </div>
+            <div>
+                <label class="block text-sm font-medium">Address Line 2</label>
+                <input type="text" name="address_line_2" value="{{ old('address_line_2', $business->address_line_2 ?? '') }}" class="mt-1 w-full border rounded px-3 py-2">
             </div>
             <div>
                 <label class="block text-sm font-medium">Terms & Conditions</label>

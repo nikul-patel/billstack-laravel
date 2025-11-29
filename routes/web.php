@@ -1,15 +1,17 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\Admin\BusinessController as AdminBusinessController;
+use App\Http\Controllers\Admin\UserController as AdminUserController;
+use App\Http\Controllers\Auth\LoginController;
 use App\Http\Controllers\BusinessController;
 use App\Http\Controllers\CustomerController;
-use App\Http\Controllers\ItemController;
-use App\Http\Controllers\RecurringProfileController;
 use App\Http\Controllers\InvoiceController;
-use App\Http\Controllers\PaymentController;
-use App\Http\Controllers\Reports\InvoiceReportController;
-use App\Http\Controllers\Auth\LoginController;
+use App\Http\Controllers\ItemController;
 use App\Http\Controllers\OnboardingController;
+use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\RecurringProfileController;
+use App\Http\Controllers\Reports\InvoiceReportController;
+use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
     return view('welcome');
@@ -50,9 +52,12 @@ Route::middleware(['auth', 'business.setup'])->group(function () {
     // Business profile
     Route::get('business/profile', [BusinessController::class, 'edit'])->name('business.profile.edit');
     Route::put('business/profile', [BusinessController::class, 'update'])->name('business.profile.update');
+    Route::post('business/switch', [BusinessController::class, 'switch'])->name('business.switch');
 
     // Resources
+    Route::get('customers/datatable', [CustomerController::class, 'datatable'])->name('customers.datatable');
     Route::resource('customers', CustomerController::class);
+    Route::get('items/datatable', [ItemController::class, 'datatable'])->name('items.datatable');
     Route::resource('items', ItemController::class);
     Route::resource('recurring-profiles', RecurringProfileController::class);
     Route::resource('invoices', InvoiceController::class);
@@ -64,6 +69,7 @@ Route::middleware(['auth', 'business.setup'])->group(function () {
     // Invoice actions
     Route::post('invoices/{invoice}/send', [InvoiceController::class, 'sendEmail'])->name('invoices.send-email');
     Route::get('invoices/{invoice}/pdf', [InvoiceController::class, 'downloadPdf'])->name('invoices.pdf');
+    Route::get('invoices/{invoice}/preview', [InvoiceController::class, 'previewPdf'])->name('invoices.preview');
 
     // Payments
     Route::post('invoices/{invoice}/payments', [PaymentController::class, 'store'])->name('invoices.payments.store');
@@ -71,4 +77,10 @@ Route::middleware(['auth', 'business.setup'])->group(function () {
 
     // Reports
     Route::get('reports/invoices', [InvoiceReportController::class, 'index'])->name('reports.invoices');
+
+    // Admin - super admin only
+    Route::prefix('admin')->name('admin.')->group(function () {
+        Route::resource('businesses', AdminBusinessController::class);
+        Route::resource('users', AdminUserController::class)->except(['show']);
+    });
 });

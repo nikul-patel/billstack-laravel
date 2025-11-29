@@ -2,10 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Payment;
 use App\Models\Invoice;
+use App\Models\Payment;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 
 /**
  * Controller for recording payments against invoices.
@@ -18,8 +17,8 @@ class PaymentController extends Controller
      */
     public function store(Request $request, Invoice $invoice)
     {
-        $business = Auth::user()->business;
-        $this->authorizeInvoice($invoice, $business->id);
+        $business = $this->requireBusiness();
+        $this->authorizeInvoice($invoice);
 
         $data = $request->validate([
             'amount' => ['required', 'numeric', 'min:0'],
@@ -32,9 +31,10 @@ class PaymentController extends Controller
         $payment = Payment::create($data);
         // update invoice amounts
         $invoice->amount_paid += $payment->amount;
-        $invoice->amount_due  = max(0, $invoice->grand_total - $invoice->amount_paid);
-        $invoice->status      = $invoice->amount_due <= 0 ? 'paid' : 'partially_paid';
+        $invoice->amount_due = max(0, $invoice->grand_total - $invoice->amount_paid);
+        $invoice->status = $invoice->amount_due <= 0 ? 'paid' : 'partially_paid';
         $invoice->save();
+
         return redirect()->route('invoices.show', $invoice)->with('success', 'Payment recorded successfully');
     }
 
@@ -43,19 +43,26 @@ class PaymentController extends Controller
      */
     public function destroy(Payment $payment)
     {
-        $this->authorizeInvoice($payment->invoice, $payment->business_id);
+        $this->authorizeInvoice($payment->invoice);
         $invoice = $payment->invoice;
         $invoice->amount_paid -= $payment->amount;
-        $invoice->amount_due  = max(0, $invoice->grand_total - $invoice->amount_paid);
-        $invoice->status      = $invoice->amount_due <= 0 ? 'paid' : 'partially_paid';
+        $invoice->amount_due = max(0, $invoice->grand_total - $invoice->amount_paid);
+        $invoice->status = $invoice->amount_due <= 0 ? 'paid' : 'partially_paid';
         $invoice->save();
         $payment->delete();
+
         return redirect()->route('invoices.show', $invoice)->with('success', 'Payment deleted successfully');
     }
 
-    protected function authorizeInvoice(Invoice $invoice, int $businessId): void
+    protected function authorizeInvoice(Invoice $invoice): void
     {
-        if ($invoice->business_id !== $businessId) {
+        if ($this->userIsSuperAdmin()) {
+            return;
+        }
+
+        $business = $this->currentBusiness();
+
+        if ($invoice->business_id !== $business?->id) {
             abort(403);
         }
     }

@@ -47,7 +47,7 @@
                 </div>
                 <div>
                     <label class="block text-sm font-medium">Invoice Prefix</label>
-                    <input type="text" name="invoice_prefix" value="{{ old('invoice_prefix', $data['invoice_prefix'] ?? 'INV-') }}" class="mt-1 w-full border rounded px-3 py-2">
+                    <input type="text" name="invoice_prefix" value="{{ old('invoice_prefix', $data['invoice_prefix'] ?? '') }}" class="mt-1 w-full border rounded px-3 py-2" placeholder="Optional">
                 </div>
                 <div>
                     <label class="block text-sm font-medium">Invoice Start Number</label>
@@ -57,6 +57,10 @@
             <div>
                 <label class="block text-sm font-medium">Address</label>
                 <textarea name="address" rows="3" class="mt-1 w-full border rounded px-3 py-2">{{ old('address', $data['address'] ?? '') }}</textarea>
+            </div>
+            <div>
+                <label class="block text-sm font-medium">Address Line 2</label>
+                <input type="text" name="address_line_2" value="{{ old('address_line_2', $data['address_line_2'] ?? '') }}" class="mt-1 w-full border rounded px-3 py-2">
             </div>
             <div class="flex justify-end">
                 <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded">Continue</button>

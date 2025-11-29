@@ -9,9 +9,15 @@
             <h2 class="text-xl font-semibold">Welcome, {{ auth()->user()->name }}</h2>
             @if($business)
                 <p class="mt-2 text-gray-700">Business: {{ $business->name }} ({{ $business->currency ?? 'INR' }})</p>
-                <p class="text-sm text-gray-500">Invoice prefix: {{ $business->invoice_prefix ?? 'INV-' }}</p>
+                <p class="text-sm text-gray-500">Invoice prefix: {{ $business->invoice_prefix ?? 'None' }}</p>
             @else
                 <p class="mt-2 text-red-600">Please complete onboarding to set up your business.</p>
+            @endif
+            @if(auth()->user()->isSuperAdmin())
+                <div class="mt-4 flex flex-wrap gap-3 text-sm">
+                    <a href="{{ route('admin.businesses.index') }}" class="text-blue-600">Manage Businesses</a>
+                    <a href="{{ route('admin.users.index') }}" class="text-blue-600">Manage Users</a>
+                </div>
             @endif
         </div>
 

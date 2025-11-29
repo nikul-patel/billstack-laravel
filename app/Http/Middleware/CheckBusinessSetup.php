@@ -12,6 +12,10 @@ class CheckBusinessSetup
     {
         $user = $request->user();
 
+        if ($user && $user->isSuperAdmin()) {
+            return $next($request);
+        }
+
         if ($user && is_null($user->business_id) && ! $request->routeIs('onboarding.*')) {
             return redirect()->route('onboarding.step1');
         }

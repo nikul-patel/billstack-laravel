@@ -3,8 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Item;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 
 /**
  * Controller for managing products/services (items).
@@ -17,9 +17,21 @@ class ItemController extends Controller
      */
     public function index()
     {
-        $business = Auth::user()->business;
-        $items = Item::where('business_id', $business->id)->paginate(20);
-        return view('items.index', compact('items'));
+        $business = $this->requireBusiness();
+
+        return view('items.index', compact('business'));
+    }
+
+    public function datatable(): JsonResponse
+    {
+        $business = $this->requireBusiness();
+        $items = Item::query()
+            ->where('business_id', $business->id)
+            ->select(['id', 'name', 'price', 'tax_rate', 'unit'])
+            ->orderBy('name')
+            ->get();
+
+        return response()->json(['data' => $items]);
     }
 
     /**
@@ -35,7 +47,7 @@ class ItemController extends Controller
      */
     public function store(Request $request)
     {
-        $business = Auth::user()->business;
+        $business = $this->requireBusiness();
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -47,6 +59,7 @@ class ItemController extends Controller
 
         $data['business_id'] = $business->id;
         Item::create($data);
+
         return redirect()->route('items.index')->with('success', 'Item created successfully');
     }
 
@@ -55,7 +68,9 @@ class ItemController extends Controller
      */
     public function edit(Item $item)
     {
-        return view('items.edit', compact('item'));
+        $this->authorizeItem($item);
+
+        return view('items.create', compact('item'));
     }
 
     /**
@@ -74,6 +89,7 @@ class ItemController extends Controller
         ]);
 
         $item->update($data);
+
         return redirect()->route('items.index')->with('success', 'Item updated successfully');
     }
 
@@ -84,12 +100,17 @@ class ItemController extends Controller
     {
         $this->authorizeItem($item);
         $item->delete();
+
         return redirect()->route('items.index')->with('success', 'Item deleted successfully');
     }
 
     protected function authorizeItem(Item $item): void
     {
-        $business = Auth::user()->business;
+        if ($this->userIsSuperAdmin()) {
+            return;
+        }
+
+        $business = $this->currentBusiness();
 
         if ($item->business_id !== $business?->id) {
             abort(403);

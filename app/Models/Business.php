@@ -16,6 +16,7 @@ class Business extends Model
         'owner_name',
         'gst_number',
         'address',
+        'address_line_2',
         'city',
         'state',
         'country',

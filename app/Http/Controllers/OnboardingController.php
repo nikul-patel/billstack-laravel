@@ -26,6 +26,7 @@ class OnboardingController extends Controller
             'phone' => ['nullable', 'string', 'max:50'],
             'gst_number' => ['nullable', 'string', 'max:50'],
             'address' => ['nullable', 'string'],
+            'address_line_2' => ['nullable', 'string', 'max:255'],
             'city' => ['nullable', 'string', 'max:255'],
             'state' => ['nullable', 'string', 'max:255'],
             'country' => ['nullable', 'string', 'max:255'],
@@ -79,7 +80,7 @@ class OnboardingController extends Controller
         $user = Auth::user();
 
         $business = Business::create(array_merge([
-            'invoice_prefix' => $data['invoice_prefix'] ?? 'INV-',
+            'invoice_prefix' => $data['invoice_prefix'] ?? null,
             'invoice_start_no' => $data['invoice_start_no'] ?? 1,
             'currency' => $data['currency'] ?? 'INR',
             'date_format' => $data['date_format'] ?? 'd-m-Y',

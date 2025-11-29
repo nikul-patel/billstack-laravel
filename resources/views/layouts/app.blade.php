@@ -8,8 +8,29 @@
 </head>
 <body class="bg-gray-50 text-gray-800 min-h-screen">
     <header class="bg-white shadow">
+        @php
+            $user = auth()->user();
+            $isSuperAdmin = $user?->isSuperAdmin() ?? false;
+            $businesses = $isSuperAdmin ? \App\Models\Business::orderBy('name')->get() : collect();
+            $activeBusiness = $user?->activeBusiness();
+        @endphp
         <div class="container mx-auto px-4 py-4 flex items-center justify-between">
-            <div class="text-xl font-semibold text-blue-700">Billstack</div>
+            <div class="flex items-center space-x-4">
+                <div class="text-xl font-semibold text-blue-700">Billstack</div>
+                @if($isSuperAdmin)
+                    <form action="{{ route('business.switch') }}" method="POST" class="flex items-center space-x-2">
+                        @csrf
+                        <label class="text-sm text-gray-600">Business</label>
+                        <select name="business_id" class="border rounded px-2 py-1 text-sm" onchange="this.form.submit()">
+                            @foreach($businesses as $businessOption)
+                                <option value="{{ $businessOption->id }}" @selected($activeBusiness?->id === $businessOption->id)>
+                                    {{ $businessOption->name }}
+                                </option>
+                            @endforeach
+                        </select>
+                    </form>
+                @endif
+            </div>
             @auth
                 <nav class="space-x-4 text-sm font-medium">
                     <a href="{{ route('dashboard') }}" class="text-gray-700 hover:text-blue-600">Dashboard</a>

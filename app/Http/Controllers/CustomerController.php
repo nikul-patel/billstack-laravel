@@ -3,8 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Models\Customer;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 
 /**
  * Controller for managing customers.
@@ -17,9 +17,21 @@ class CustomerController extends Controller
      */
     public function index()
     {
-        $business = Auth::user()->business;
-        $customers = Customer::where('business_id', $business->id)->paginate(20);
-        return view('customers.index', compact('customers'));
+        $business = $this->requireBusiness();
+
+        return view('customers.index', compact('business'));
+    }
+
+    public function datatable(): JsonResponse
+    {
+        $business = $this->requireBusiness();
+        $customers = Customer::query()
+            ->where('business_id', $business->id)
+            ->select(['id', 'name', 'email', 'phone', 'city', 'state', 'country'])
+            ->orderBy('name')
+            ->get();
+
+        return response()->json(['data' => $customers]);
     }
 
     /**
@@ -35,7 +47,7 @@ class CustomerController extends Controller
      */
     public function store(Request $request)
     {
-        $business = Auth::user()->business;
+        $business = $this->requireBusiness();
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -57,6 +69,7 @@ class CustomerController extends Controller
         $data['business_id'] = $business->id;
 
         Customer::create($data);
+
         return redirect()->route('customers.index')->with('success', 'Customer created successfully');
     }
 
@@ -65,7 +78,9 @@ class CustomerController extends Controller
      */
     public function edit(Customer $customer)
     {
-        return view('customers.edit', compact('customer'));
+        $this->authorizeCustomer($customer);
+
+        return view('customers.create', compact('customer'));
     }
 
     /**
@@ -93,6 +108,7 @@ class CustomerController extends Controller
         ]);
 
         $customer->update($data);
+
         return redirect()->route('customers.index')->with('success', 'Customer updated successfully');
     }
 
@@ -103,12 +119,17 @@ class CustomerController extends Controller
     {
         $this->authorizeCustomer($customer);
         $customer->delete();
+
         return redirect()->route('customers.index')->with('success', 'Customer deleted successfully');
     }
 
     protected function authorizeCustomer(Customer $customer): void
     {
-        $business = Auth::user()->business;
+        if ($this->userIsSuperAdmin()) {
+            return;
+        }
+
+        $business = $this->currentBusiness();
 
         if ($customer->business_id !== $business?->id) {
             abort(403);

@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\InvoiceItem;
-use App\Models\Customer;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
@@ -20,8 +20,9 @@ class InvoiceController extends Controller
      */
     public function index()
     {
-        $business = Auth::user()->business;
+        $business = $this->requireBusiness();
         $invoices = Invoice::where('business_id', $business->id)->orderByDesc('invoice_date')->paginate(20);
+
         return view('invoices.index', compact('invoices'));
     }
 
@@ -30,9 +31,12 @@ class InvoiceController extends Controller
      */
     public function create()
     {
-        $business = Auth::user()->business;
+        $business = $this->requireBusiness();
         $customers = Customer::where('business_id', $business->id)->get();
-        return view('invoices.create', compact('customers'));
+
+        $items = \App\Models\Item::where('business_id', $business->id)->orderBy('name')->get();
+
+        return view('invoices.create', compact('customers', 'items'));
     }
 
     /**
@@ -40,18 +44,26 @@ class InvoiceController extends Controller
      */
     public function store(Request $request)
     {
-        $business = Auth::user()->business;
+        $business = $this->requireBusiness();
         $data = $request->validate([
             'customer_id' => ['required', 'integer'],
             'invoice_date' => ['required', 'date'],
             'due_date' => ['nullable', 'date'],
             'notes' => ['nullable', 'string'],
             'terms' => ['nullable', 'string'],
+            'items' => ['nullable', 'array'],
+            'items.*.item_id' => ['nullable', 'integer'],
+            'items.*.name' => ['required_with:items', 'string', 'max:255'],
+            'items.*.description' => ['nullable', 'string'],
+            'items.*.rate' => ['required_with:items', 'numeric'],
+            'items.*.quantity' => ['required_with:items', 'numeric'],
+            'items.*.tax_percent' => ['nullable', 'numeric'],
+            'items.*.sort_order' => ['nullable', 'integer'],
         ]);
 
         $data['business_id'] = $business->id;
         $data['currency'] = $business->currency ?? 'INR';
-        $data['invoice_number'] = ($business->invoice_prefix ?? 'INV-') . str_pad($business->invoice_start_no ?? 1, 4, '0', STR_PAD_LEFT);
+        $data['invoice_number'] = ($business->invoice_prefix ?? '').str_pad($business->invoice_start_no ?? 1, 4, '0', STR_PAD_LEFT);
         $data['public_hash'] = Str::random(40);
         $data['created_by'] = Auth::id();
         $invoice = Invoice::create($data);
@@ -61,12 +73,12 @@ class InvoiceController extends Controller
             foreach ($request->input('items') as $item) {
                 InvoiceItem::create([
                     'invoice_id' => $invoice->id,
-                    'item_id'    => $item['item_id'] ?? null,
-                    'name'       => $item['name'],
-                    'description'=> $item['description'] ?? null,
-                    'rate'       => $item['rate'],
-                    'quantity'   => $item['quantity'],
-                    'tax_percent'=> $item['tax_percent'] ?? null,
+                    'item_id' => $item['item_id'] ?? null,
+                    'name' => $item['name'],
+                    'description' => $item['description'] ?? null,
+                    'rate' => $item['rate'],
+                    'quantity' => $item['quantity'],
+                    'tax_percent' => $item['tax_percent'] ?? null,
                     'tax_amount' => 0,
                     'line_total' => $item['rate'] * $item['quantity'],
                     'sort_order' => $item['sort_order'] ?? 0,
@@ -75,14 +87,15 @@ class InvoiceController extends Controller
             }
         }
         // update totals
-        $invoice->subtotal    = $subtotal;
+        $invoice->subtotal = $subtotal;
         $invoice->grand_total = $subtotal;
-        $invoice->amount_due  = $subtotal;
+        $invoice->amount_due = $subtotal;
         $invoice->save();
 
         // increment invoice number
         $business->invoice_start_no = ($business->invoice_start_no ?? 1) + 1;
         $business->save();
+
         return redirect()->route('invoices.show', $invoice)->with('success', 'Invoice created successfully');
     }
 
@@ -92,6 +105,7 @@ class InvoiceController extends Controller
     public function show(Invoice $invoice)
     {
         $this->authorizeInvoice($invoice);
+
         return view('invoices.show', compact('invoice'));
     }
 
@@ -101,9 +115,11 @@ class InvoiceController extends Controller
     public function edit(Invoice $invoice)
     {
         $this->authorizeInvoice($invoice);
-        $business = Auth::user()->business;
+        $business = $this->requireBusiness();
         $customers = Customer::where('business_id', $business->id)->get();
-        return view('invoices.edit', compact('invoice', 'customers'));
+        $items = \App\Models\Item::where('business_id', $business->id)->orderBy('name')->get();
+
+        return view('invoices.create', compact('invoice', 'customers', 'items'));
     }
 
     /**
@@ -118,6 +134,14 @@ class InvoiceController extends Controller
             'due_date' => ['nullable', 'date'],
             'notes' => ['nullable', 'string'],
             'terms' => ['nullable', 'string'],
+            'items' => ['nullable', 'array'],
+            'items.*.item_id' => ['nullable', 'integer'],
+            'items.*.name' => ['required_with:items', 'string', 'max:255'],
+            'items.*.description' => ['nullable', 'string'],
+            'items.*.rate' => ['required_with:items', 'numeric'],
+            'items.*.quantity' => ['required_with:items', 'numeric'],
+            'items.*.tax_percent' => ['nullable', 'numeric'],
+            'items.*.sort_order' => ['nullable', 'integer'],
         ]);
 
         $invoice->update($data);
@@ -128,12 +152,12 @@ class InvoiceController extends Controller
             foreach ($request->input('items') as $item) {
                 InvoiceItem::create([
                     'invoice_id' => $invoice->id,
-                    'item_id'    => $item['item_id'] ?? null,
-                    'name'       => $item['name'],
-                    'description'=> $item['description'] ?? null,
-                    'rate'       => $item['rate'],
-                    'quantity'   => $item['quantity'],
-                    'tax_percent'=> $item['tax_percent'] ?? null,
+                    'item_id' => $item['item_id'] ?? null,
+                    'name' => $item['name'],
+                    'description' => $item['description'] ?? null,
+                    'rate' => $item['rate'],
+                    'quantity' => $item['quantity'],
+                    'tax_percent' => $item['tax_percent'] ?? null,
                     'tax_amount' => 0,
                     'line_total' => $item['rate'] * $item['quantity'],
                     'sort_order' => $item['sort_order'] ?? 0,
@@ -141,10 +165,11 @@ class InvoiceController extends Controller
                 $subtotal += $item['rate'] * $item['quantity'];
             }
         }
-        $invoice->subtotal    = $subtotal;
+        $invoice->subtotal = $subtotal;
         $invoice->grand_total = $subtotal;
-        $invoice->amount_due  = $subtotal - $invoice->amount_paid;
+        $invoice->amount_due = $subtotal - $invoice->amount_paid;
         $invoice->save();
+
         return redirect()->route('invoices.show', $invoice)->with('success', 'Invoice updated successfully');
     }
 
@@ -155,6 +180,7 @@ class InvoiceController extends Controller
     {
         $this->authorizeInvoice($invoice);
         $invoice->delete();
+
         return redirect()->route('invoices.index')->with('success', 'Invoice deleted successfully');
     }
 
@@ -164,13 +190,32 @@ class InvoiceController extends Controller
     public function downloadPdf(Invoice $invoice)
     {
         $this->authorizeInvoice($invoice);
-        $template = $invoice->template_key ?? $invoice->business->default_template_key ?? 'classic_detailed';
+        $template = $invoice->template_key ?? $invoice->business->default_template_key ?? 'formal_black';
         $view = match ($template) {
+            'formal_black' => 'invoices.templates.formal_black',
             'classic_detailed' => 'invoices.templates.classic_detailed',
-            default           => 'invoices.templates.classic_detailed',
+            default => 'invoices.templates.classic_detailed',
         };
         $pdf = app('dompdf.wrapper')->loadView($view, compact('invoice'));
+
         return $pdf->download("Invoice-{$invoice->invoice_number}.pdf");
+    }
+
+    /**
+     * Stream the invoice PDF in-browser for preview.
+     */
+    public function previewPdf(Invoice $invoice)
+    {
+        $this->authorizeInvoice($invoice);
+        $template = $invoice->template_key ?? $invoice->business->default_template_key ?? 'formal_black';
+        $view = match ($template) {
+            'formal_black' => 'invoices.templates.formal_black',
+            'classic_detailed' => 'invoices.templates.classic_detailed',
+            default => 'invoices.templates.classic_detailed',
+        };
+        $pdf = app('dompdf.wrapper')->loadView($view, compact('invoice'));
+
+        return $pdf->stream("Invoice-{$invoice->invoice_number}.pdf", ['Attachment' => false]);
     }
 
     /**
@@ -179,13 +224,18 @@ class InvoiceController extends Controller
     public function sendEmail(Invoice $invoice)
     {
         $this->authorizeInvoice($invoice);
+
         // send email logic here
         return redirect()->back()->with('success', 'Email sent successfully');
     }
 
     protected function authorizeInvoice(Invoice $invoice): void
     {
-        $business = Auth::user()->business;
+        if ($this->userIsSuperAdmin()) {
+            return;
+        }
+
+        $business = $this->currentBusiness();
 
         if ($invoice->business_id !== $business?->id) {
             abort(403);

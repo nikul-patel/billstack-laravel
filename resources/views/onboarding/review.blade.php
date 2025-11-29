@@ -15,7 +15,7 @@
                 <li><strong>GST / Tax ID:</strong> {{ $data['gst_number'] ?? '' }}</li>
                 <li><strong>Address:</strong> {{ $data['address'] ?? '' }}</li>
                 <li><strong>Location:</strong> {{ implode(', ', array_filter([$data['city'] ?? '', $data['state'] ?? '', $data['country'] ?? '', $data['pincode'] ?? ''])) }}</li>
-                <li><strong>Invoice Prefix:</strong> {{ $data['invoice_prefix'] ?? 'INV-' }} / <strong>Start No:</strong> {{ $data['invoice_start_no'] ?? 1 }}</li>
+                <li><strong>Invoice Prefix:</strong> {{ $data['invoice_prefix'] ?? 'None' }} / <strong>Start No:</strong> {{ $data['invoice_start_no'] ?? 1 }}</li>
             </ul>
         </div>
 
