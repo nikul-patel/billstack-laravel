@@ -159,14 +159,6 @@
             font-size: 0.85rem;
         }
 
-        .user-pill {
-            padding: 0.4rem 0.9rem;
-            border-radius: 999px;
-            background: rgba(148, 163, 184, 0.15);
-            font-size: 0.85rem;
-            color: var(--text-color);
-        }
-
         .btn-outline {
             border-radius: 999px;
             padding: 0.45rem 1rem;
@@ -185,79 +177,126 @@
         .btn-outline:hover {
             background: rgba(148, 163, 184, 0.2);
         }
-        
-        .theme-switcher {
+
+        .profile-dropdown {
             position: relative;
         }
 
-        .theme-icon {
-            width: 38px;
-            height: 38px;
-            border-radius: 999px;
-            border: 1px solid rgba(248, 250, 252, 0.35);
-            background: transparent;
+        .profile-trigger {
             display: flex;
             align-items: center;
-            justify-content: center;
-            font-size: 1.1rem;
+            gap: 0.65rem;
+            border: 1px solid rgba(248, 250, 252, 0.2);
+            border-radius: 999px;
+            padding: 0.35rem 0.9rem 0.35rem 0.4rem;
+            background: transparent;
             color: var(--text-color);
-            transition: transform 0.2s ease, background 0.2s ease;
+            cursor: pointer;
+            transition: background 0.2s ease, border-color 0.2s ease;
         }
 
-        body.app-body[data-theme="light"] .theme-icon {
-            border-color: rgba(15, 23, 42, 0.2);
+        body.app-body[data-theme="light"] .profile-trigger {
+            border-color: rgba(15, 23, 42, 0.15);
             color: #0f172a;
         }
 
-        .theme-icon:hover {
-            background: rgba(248, 250, 252, 0.15);
-            transform: translateY(-1px);
+        .profile-trigger:hover {
+            background: rgba(248, 250, 252, 0.12);
         }
 
-        .theme-menu {
+        .profile-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary), var(--accent));
+            display: grid;
+            place-items: center;
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: #fff;
+        }
+
+        .profile-name {
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .profile-dropdown.open .profile-trigger {
+            background: rgba(248, 250, 252, 0.12);
+        }
+
+        .profile-menu {
             position: absolute;
             top: 115%;
             right: 0;
             background: var(--panel-bg);
             border: 1px solid var(--border-color);
-            border-radius: 14px;
-            padding: 8px;
-            min-width: 150px;
-            box-shadow: 0 20px 35px rgba(2, 6, 23, 0.45);
+            border-radius: 20px;
+            width: min(320px, 80vw);
+            padding: 1rem;
+            box-shadow: 0 25px 45px rgba(2, 6, 23, 0.55);
             opacity: 0;
             pointer-events: none;
-            transform: translateY(6px);
+            transform: translateY(8px);
             transition: opacity 0.2s ease, transform 0.2s ease;
         }
 
-        .theme-switcher.open .theme-menu {
+        .profile-dropdown.open .profile-menu {
             opacity: 1;
             pointer-events: auto;
             transform: translateY(0);
         }
 
-        .theme-menu button {
-            width: 100%;
-            border: none;
+        .profile-header {
+            margin-bottom: 0.75rem;
+        }
+
+        .profile-header strong {
+            display: block;
+            font-size: 1rem;
+        }
+
+        .profile-header span {
+            font-size: 0.85rem;
+            color: var(--brand-subtext);
+        }
+
+        .profile-section {
+            margin-top: 1rem;
+        }
+
+        .profile-section__label {
+            margin-bottom: 0.35rem;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--brand-subtext);
+        }
+
+        .profile-theme-options {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .profile-theme-options button {
+            flex: 1;
+            border-radius: 12px;
+            border: 1px solid rgba(148, 163, 184, 0.3);
             background: transparent;
             color: var(--text-color);
-            padding: 6px 10px;
-            border-radius: 10px;
+            padding: 0.5rem 0.75rem;
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            font-size: 0.9rem;
+            justify-content: center;
+            gap: 0.35rem;
             cursor: pointer;
-            margin-bottom: 4px;
+            font-weight: 600;
         }
 
-        .theme-menu button span {
-            font-size: 1.1rem;
-        }
-
-        .theme-menu button:hover,
-        .theme-menu button.active {
-            background: rgba(59, 130, 246, 0.25);
+        .profile-theme-options button.active,
+        .profile-theme-options button:hover {
+            border-color: var(--accent);
+            background: rgba(59, 130, 246, 0.15);
         }
 
         .btn-primary-pill {
@@ -452,38 +491,58 @@
                 </nav>
             @endauth
             <div class="app-actions">
-                @if($isSuperAdmin)
-                    <form action="{{ route('business.switch') }}" method="POST" class="business-switch flex items-center gap-2">
-                        @csrf
-                        <label>Business</label>
-                        <select name="business_id" onchange="this.form.submit()">
-                            @foreach($businesses as $businessOption)
-                                <option value="{{ $businessOption->id }}" @selected($activeBusiness?->id === $businessOption->id)>
-                                    {{ $businessOption->name }}
-                                </option>
-                            @endforeach
-                        </select>
-                    </form>
-                @endif
-                <div class="theme-switcher" data-theme-switcher>
-                    <button class="theme-icon" type="button" aria-label="Toggle theme" aria-expanded="false" data-theme-toggle>☾</button>
-                    <div class="theme-menu" role="menu">
-                        <button type="button" data-theme-option="dark" role="menuitem">
-                            <span>☾</span>
-                            <strong>Dark Mode</strong>
-                        </button>
-                        <button type="button" data-theme-option="light" role="menuitem">
-                            <span>☀️</span>
-                            <strong>Light Mode</strong>
-                        </button>
-                    </div>
-                </div>
                 @auth
-                    <span class="user-pill">{{ $user->name }}</span>
-                    <form method="POST" action="{{ route('logout') }}">
-                        @csrf
-                        <button class="btn-outline" type="submit">Logout</button>
-                    </form>
+                    <div class="profile-dropdown" data-profile-dropdown>
+                        <button class="profile-trigger" type="button" data-profile-trigger>
+                            <span class="profile-avatar">
+                                {{ strtoupper(\Illuminate\Support\Str::of($user->name ?? 'BS')->substr(0, 2)) }}
+                            </span>
+                            <span class="profile-name">{{ $user->name }}</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M6 9l6 6 6-6" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>
+                            </svg>
+                        </button>
+                        <div class="profile-menu" data-profile-menu>
+                            <div class="profile-header">
+                                <strong>{{ $user->name }}</strong>
+                                <span>{{ $user->email }}</span>
+                            </div>
+                            @if($isSuperAdmin)
+                                <div class="profile-section">
+                                    <p class="profile-section__label">Switch business</p>
+                                    <form action="{{ route('business.switch') }}" method="POST">
+                                        @csrf
+                                        <select name="business_id" onchange="this.form.submit()" class="w-full">
+                                            @foreach($businesses as $businessOption)
+                                                <option value="{{ $businessOption->id }}" @selected($activeBusiness?->id === $businessOption->id)>
+                                                    {{ $businessOption->name }}
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                    </form>
+                                </div>
+                            @endif
+                            <div class="profile-section">
+                                <p class="profile-section__label">Theme mode</p>
+                                <div class="profile-theme-options" data-theme-switcher>
+                                    <button type="button" data-theme-option="dark">
+                                        <span>☾</span>
+                                        Dark
+                                    </button>
+                                    <button type="button" data-theme-option="light">
+                                        <span>☀️</span>
+                                        Light
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="profile-section">
+                                <form method="POST" action="{{ route('logout') }}">
+                                    @csrf
+                                    <button class="btn-outline w-full" type="submit">Logout</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
                 @else
                     <a href="{{ route('login') }}" class="btn-primary-pill">Sign in</a>
                 @endauth
@@ -522,20 +581,11 @@
         </div>
     </main>
     <script>
-        (function() {
+        (function () {
             const themeKey = 'billstack-theme';
-            const switchers = document.querySelectorAll('[data-theme-switcher]');
-            const toggleButtons = document.querySelectorAll('[data-theme-toggle]');
             const themeOptions = document.querySelectorAll('[data-theme-option]');
 
-            const updateToggleDisplays = (theme) => {
-                toggleButtons.forEach(button => {
-                    button.textContent = theme === 'dark' ? '☾' : '☀️';
-                    const container = button.closest('[data-theme-switcher]');
-                    const expanded = container?.classList.contains('open') ? 'true' : 'false';
-                    button.setAttribute('aria-expanded', expanded);
-                    button.setAttribute('aria-label', theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode');
-                });
+            const highlightActiveTheme = (theme) => {
                 themeOptions.forEach(option => {
                     option.classList.toggle('active', option.dataset.themeOption === theme);
                 });
@@ -543,22 +593,11 @@
 
             const applyTheme = (theme) => {
                 document.body.setAttribute('data-theme', theme);
-                updateToggleDisplays(theme);
+                highlightActiveTheme(theme);
             };
 
             const storedTheme = localStorage.getItem(themeKey) || 'dark';
             applyTheme(storedTheme);
-
-            toggleButtons.forEach(button => {
-                button.addEventListener('click', () => {
-                    const container = button.closest('[data-theme-switcher]');
-                    if (!container) {
-                        return;
-                    }
-                    container.classList.toggle('open');
-                    button.setAttribute('aria-expanded', container.classList.contains('open') ? 'true' : 'false');
-                });
-            });
 
             themeOptions.forEach(option => {
                 option.addEventListener('click', () => {
@@ -568,21 +607,33 @@
                     }
                     localStorage.setItem(themeKey, selectedTheme);
                     applyTheme(selectedTheme);
-                    const container = option.closest('[data-theme-switcher]');
-                    const toggle = container?.querySelector('[data-theme-toggle]');
-                    container?.classList.remove('open');
-                    toggle?.setAttribute('aria-expanded', 'false');
                 });
+            });
+        })();
+
+        (function () {
+            const dropdown = document.querySelector('[data-profile-dropdown]');
+            if (!dropdown) {
+                return;
+            }
+            const trigger = dropdown.querySelector('[data-profile-trigger]');
+
+            const closeDropdown = () => dropdown.classList.remove('open');
+
+            trigger?.addEventListener('click', () => {
+                dropdown.classList.toggle('open');
             });
 
             document.addEventListener('click', (event) => {
-                switchers.forEach(container => {
-                    if (!container.contains(event.target)) {
-                        container.classList.remove('open');
-                        const toggle = container.querySelector('[data-theme-toggle]');
-                        toggle?.setAttribute('aria-expanded', 'false');
-                    }
-                });
+                if (!dropdown.contains(event.target)) {
+                    closeDropdown();
+                }
+            });
+
+            document.addEventListener('keydown', (event) => {
+                if (event.key === 'Escape') {
+                    closeDropdown();
+                }
             });
         })();
     </script>
