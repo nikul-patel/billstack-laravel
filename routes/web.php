@@ -63,6 +63,8 @@ Route::middleware(['auth', 'business.setup'])->group(function () {
     Route::resource('invoices', InvoiceController::class);
 
     // Recurring profiles: generate invoices
+    Route::get('recurring-profiles/{profile}/prepare', [RecurringProfileController::class, 'prepare'])
+        ->name('recurring-profiles.prepare');
     Route::post('recurring-profiles/{profile}/generate-invoices', [RecurringProfileController::class, 'generateInvoices'])
         ->name('recurring-profiles.generate-invoices');
 

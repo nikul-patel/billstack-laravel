@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Invoice;
-use App\Models\InvoiceItem;
+use App\Models\Customer;
+use App\Models\Item;
 use App\Models\RecurringProfile;
 use App\Models\RecurringProfileItem;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 
 /**
  * Controller for managing recurring billing profiles.
@@ -19,12 +19,31 @@ class RecurringProfileController extends Controller
     /**
      * Display a listing of recurring profiles.
      */
-    public function index()
+    public function index(Request $request)
     {
         $business = $this->requireBusiness();
-        $profiles = RecurringProfile::where('business_id', $business->id)->paginate(20);
+        $search = trim((string) $request->input('search', ''));
 
-        return view('recurring-profiles.index', compact('profiles'));
+        $profiles = RecurringProfile::with('customer')
+            ->where('business_id', $business->id)
+            ->when($search !== '', function ($query) use ($search) {
+                $query->where(function ($subQuery) use ($search) {
+                    $subQuery
+                        ->where('name', 'like', "%{$search}%")
+                        ->orWhereHas('customer', function ($customerQuery) use ($search) {
+                            $customerQuery->where('name', 'like', "%{$search}%");
+                        });
+                });
+            })
+            ->orderByDesc('next_run_date')
+            ->orderByDesc('created_at')
+            ->paginate(15)
+            ->withQueryString();
+
+        return view('recurring-profiles.index', [
+            'profiles' => $profiles,
+            'search' => $search,
+        ]);
     }
 
     /**
@@ -32,7 +51,18 @@ class RecurringProfileController extends Controller
      */
     public function create()
     {
-        return view('recurring-profiles.create');
+        $business = $this->requireBusiness();
+
+        return view('recurring-profiles.create', [
+            'profile' => new RecurringProfile([
+                'frequency' => 'monthly',
+                'next_run_date' => now()->toDateString(),
+                'day_of_month' => now()->day,
+            ]),
+            'customers' => $this->customersForBusiness($business->id),
+            'frequencies' => $this->frequencyOptions(),
+            'isEdit' => false,
+        ]);
     }
 
     /**
@@ -43,15 +73,20 @@ class RecurringProfileController extends Controller
         $business = $this->requireBusiness();
 
         $data = $request->validate([
-            'customer_id' => ['required', 'integer'],
-            'name' => ['nullable', 'string', 'max:255'],
-            'frequency' => ['required', 'string', 'max:50'],
+            'customer_id' => [
+                'required',
+                Rule::exists('customers', 'id')->where('business_id', $business->id),
+            ],
+            'name' => ['required', 'string', 'max:255'],
+            'frequency' => ['required', Rule::in(array_keys($this->frequencyOptions()))],
             'next_run_date' => ['nullable', 'date'],
             'day_of_month' => ['nullable', 'integer', 'between:1,31'],
-            'amount' => ['nullable', 'numeric'],
+            'amount' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string'],
         ]);
         $data['business_id'] = $business->id;
+        $data['next_run_date'] = $data['next_run_date'] ?? now()->toDateString();
+        $data['amount'] = $data['amount'] ?? 0;
         $profile = RecurringProfile::create($data);
         // Items creation (if present)
         if ($request->has('items')) {
@@ -77,8 +112,14 @@ class RecurringProfileController extends Controller
     public function edit(RecurringProfile $recurring_profile)
     {
         $this->authorizeProfile($recurring_profile);
+        $business = $this->requireBusiness();
 
-        return view('recurring-profiles.edit', ['profile' => $recurring_profile]);
+        return view('recurring-profiles.create', [
+            'profile' => $recurring_profile,
+            'customers' => $this->customersForBusiness($business->id),
+            'frequencies' => $this->frequencyOptions(),
+            'isEdit' => true,
+        ]);
     }
 
     /**
@@ -88,15 +129,23 @@ class RecurringProfileController extends Controller
     {
         $this->authorizeProfile($recurring_profile);
 
+        $business = $this->requireBusiness();
+
         $data = $request->validate([
-            'customer_id' => ['required', 'integer'],
-            'name' => ['nullable', 'string', 'max:255'],
-            'frequency' => ['required', 'string', 'max:50'],
+            'customer_id' => [
+                'required',
+                Rule::exists('customers', 'id')->where('business_id', $business->id),
+            ],
+            'name' => ['required', 'string', 'max:255'],
+            'frequency' => ['required', Rule::in(array_keys($this->frequencyOptions()))],
             'next_run_date' => ['nullable', 'date'],
             'day_of_month' => ['nullable', 'integer', 'between:1,31'],
-            'amount' => ['nullable', 'numeric'],
+            'amount' => ['nullable', 'numeric', 'min:0'],
             'notes' => ['nullable', 'string'],
         ]);
+
+        $data['next_run_date'] = $data['next_run_date'] ?? now()->toDateString();
+        $data['amount'] = $data['amount'] ?? 0;
 
         $recurring_profile->update($data);
         // Update items (simplified: delete and recreate)
@@ -130,58 +179,85 @@ class RecurringProfileController extends Controller
     }
 
     /**
-     * Generate invoices from a recurring profile.
+     * Allow the user to pick items prior to generating an invoice.
      */
-    public function generateInvoices(RecurringProfile $profile, Request $request)
+    public function prepare(RecurringProfile $profile)
     {
         $this->authorizeProfile($profile);
         $business = $this->requireBusiness();
-        // Example: create a single invoice for this profile's customer
-        $invoice = Invoice::create([
-            'business_id' => $business->id,
-            'customer_id' => $profile->customer_id,
-            'invoice_number' => ($business->invoice_prefix ?? '').str_pad($business->invoice_start_no ?? 1, 4, '0', STR_PAD_LEFT),
-            'invoice_date' => now(),
-            'due_date' => now()->addDays(7),
-            'status' => 'draft',
-            'currency' => $business->currency ?? 'INR',
-            'subtotal' => 0,
-            'discount_type' => 'none',
-            'discount_value' => 0,
-            'tax_total' => 0,
-            'grand_total' => 0,
-            'amount_paid' => 0,
-            'amount_due' => 0,
-            'public_hash' => Str::random(40),
-            'created_by' => Auth::id(),
+
+        return view('recurring-profiles.prepare', [
+            'profile' => $profile->load('customer'),
+            'items' => $this->itemsForBusiness($business->id),
         ]);
-        $lineTotal = 0;
-        foreach ($profile->items as $item) {
-            InvoiceItem::create([
-                'invoice_id' => $invoice->id,
-                'item_id' => $item->item_id,
-                'name' => $item->name,
-                'description' => $item->description,
-                'rate' => $item->rate,
-                'quantity' => $item->quantity,
-                'tax_percent' => $item->tax_percent,
-                'tax_amount' => 0,
-                'line_total' => $item->rate * $item->quantity,
-                'sort_order' => $item->sort_order,
-            ]);
-            $lineTotal += $item->rate * $item->quantity;
+    }
+
+    /**
+     * Generate invoices from a recurring profile.
+     */
+    public function generateInvoices(Request $request, RecurringProfile $profile)
+    {
+        $this->authorizeProfile($profile);
+        $business = $this->requireBusiness();
+
+        $validated = $request->validate([
+            'items' => ['required', 'array'],
+            'items.*.item_id' => [
+                'required',
+                Rule::exists('items', 'id')->where('business_id', $business->id),
+            ],
+            'items.*.quantity' => ['required', 'numeric', 'gt:0'],
+            'items.*.rate' => ['nullable', 'numeric', 'min:0'],
+        ], [
+            'items.required' => 'Select at least one item to build the invoice.',
+        ]);
+
+        $itemsCollection = $this->itemsForBusiness($business->id)->keyBy('id');
+        $selectedItems = collect($validated['items'])
+            ->filter(function ($item) {
+                return (float) ($item['quantity'] ?? 0) > 0;
+            })
+            ->map(function ($item, $index) use ($itemsCollection) {
+                $catalogItem = $itemsCollection->get((int) $item['item_id']);
+
+                $rate = $item['rate'] ?? $catalogItem?->price ?? 0;
+
+                return [
+                    'item_id' => $catalogItem?->id,
+                    'name' => $catalogItem?->name,
+                    'description' => $catalogItem?->description,
+                    'rate' => (float) $rate,
+                    'quantity' => (float) $item['quantity'],
+                    'tax_percent' => $catalogItem?->tax_rate ?? 0,
+                    'sort_order' => $index,
+                ];
+            })
+            ->filter(function ($line) {
+                return $line['item_id'] !== null;
+            })
+            ->values();
+
+        if ($selectedItems->isEmpty()) {
+            return back()
+                ->withErrors(['items' => 'Select at least one catalog item with a quantity greater than zero.'])
+                ->withInput();
         }
-        // update totals
-        $invoice->subtotal = $lineTotal;
-        $invoice->grand_total = $lineTotal;
-        $invoice->amount_due = $lineTotal;
-        $invoice->save();
 
-        // increment business invoice numbering
-        $business->invoice_start_no = ($business->invoice_start_no ?? 1) + 1;
-        $business->save();
+        try {
+            $invoice = $profile->generateInvoice(Auth::id(), $selectedItems->all());
+        } catch (\Throwable $exception) {
+            report($exception);
 
-        return redirect()->route('invoices.edit', $invoice)->with('success', 'Invoice generated from recurring profile');
+            return back()
+                ->withErrors(['items' => 'Unable to draft invoice: '.$exception->getMessage()])
+                ->withInput();
+        }
+
+        $profile->advanceToNextRun();
+
+        return redirect()
+            ->route('invoices.edit', $invoice)
+            ->with('success', 'Invoice generated from recurring profile');
     }
 
     protected function authorizeProfile(RecurringProfile $profile): void
@@ -195,5 +271,33 @@ class RecurringProfileController extends Controller
         if ($profile->business_id !== $business?->id) {
             abort(403);
         }
+    }
+
+    private function customersForBusiness(int $businessId)
+    {
+        return Customer::select('id', 'name')
+            ->where('business_id', $businessId)
+            ->orderBy('name')
+            ->get();
+    }
+
+    private function frequencyOptions(): array
+    {
+        return [
+            'daily' => 'Daily',
+            'weekly' => 'Weekly',
+            'biweekly' => 'Every 2 Weeks',
+            'monthly' => 'Monthly',
+            'quarterly' => 'Quarterly',
+            'yearly' => 'Yearly',
+        ];
+    }
+
+    private function itemsForBusiness(int $businessId)
+    {
+        return Item::select('id', 'name', 'price', 'tax_rate', 'description')
+            ->where('business_id', $businessId)
+            ->orderBy('name')
+            ->get();
     }
 }
