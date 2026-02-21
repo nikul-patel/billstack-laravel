@@ -9,6 +9,7 @@ use App\Http\Controllers\InvoiceController;
 use App\Http\Controllers\ItemController;
 use App\Http\Controllers\OnboardingController;
 use App\Http\Controllers\PaymentController;
+use App\Http\Controllers\ProductController;
 use App\Http\Controllers\RecurringProfileController;
 use App\Http\Controllers\Reports\InvoiceReportController;
 use Illuminate\Support\Facades\Route;
@@ -59,6 +60,7 @@ Route::middleware(['auth', 'business.setup'])->group(function () {
     Route::resource('customers', CustomerController::class);
     Route::get('items/datatable', [ItemController::class, 'datatable'])->name('items.datatable');
     Route::resource('items', ItemController::class);
+    Route::resource('products', ProductController::class);
     Route::resource('recurring-profiles', RecurringProfileController::class);
     Route::resource('invoices', InvoiceController::class);
 
