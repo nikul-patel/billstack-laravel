@@ -38,8 +38,10 @@ class BusinessController extends Controller
             ->sum('grand_total');
 
         // Outstanding amount (unpaid/partial invoice balances)
+        // Include 'partially_paid' for backward compatibility with invoices created before the
+        // status was normalised to 'partial'.
         $outstandingAmount = Invoice::where('business_id', $businessId)
-            ->whereIn('status', ['sent', 'partial', 'draft'])
+            ->whereIn('status', ['sent', 'partial', 'partially_paid', 'draft'])
             ->sum('amount_due');
 
         // Overdue invoices (past due_date, not paid/cancelled)
