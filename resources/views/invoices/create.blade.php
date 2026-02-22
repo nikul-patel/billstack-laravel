@@ -3,6 +3,17 @@
 @php
     $isEdit = isset($invoice);
     $products = $products ?? collect();
+    $productsData = $products->map(function ($product) {
+        return [
+            'id' => $product->id,
+            'name' => $product->name,
+            'description' => $product->description ?? '',
+            'unit' => $product->unit,
+            'rate' => $product->default_rate,
+            'tax_rate' => $product->tax_rate,
+            'hsn_code' => $product->hsn_code ?? '',
+        ];
+    })->values();
 @endphp
 
 @section('title', $isEdit ? 'Edit Invoice' : 'Create Invoice')
@@ -11,15 +22,7 @@
 @section('content')
     {{-- Product catalog data for JS auto-fill --}}
     <script id="products-data" type="application/json">
-        @json($products->map(fn($p) => [
-            'id'          => $p->id,
-            'name'        => $p->name,
-            'description' => $p->description ?? '',
-            'unit'        => $p->unit,
-            'rate'        => $p->default_rate,
-            'tax_rate'    => $p->tax_rate,
-            'hsn_code'    => $p->hsn_code ?? '',
-        ]))
+        @json($productsData)
     </script>
 
     <div class="bg-white shadow rounded p-6 max-w-4xl mx-auto">
