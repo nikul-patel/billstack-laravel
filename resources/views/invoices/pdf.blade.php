@@ -130,8 +130,12 @@
         <div class="header-left">
             <div class="business-name">{{ $business->name }}</div>
             <div class="business-meta">
-                @if($business->address){{ $business->address }}@if($businessCityState), @endif@endif
-                @if($businessCityState){{ $businessCityState }}@if($business->pincode) - {{ $business->pincode }}@endif@endif
+                @if($business->address)
+                    {{ $business->address }}@if($businessCityState), @endif
+                @endif
+                @if($businessCityState)
+                    {{ $businessCityState }}@if($business->pincode) - {{ $business->pincode }}@endif
+                @endif
                 @if($business->country)<br>{{ $business->country }}@endif
                 @if($business->phone)<br>Ph: {{ $business->phone }}@endif
                 @if($business->email)<br>{{ $business->email }}@endif
@@ -185,7 +189,9 @@
             <div class="party-detail">
                 @if($customer->billing_address_line_1){{ $customer->billing_address_line_1 }}<br>@endif
                 @if($customer->billing_address_line_2){{ $customer->billing_address_line_2 }}<br>@endif
-                @if($customerCityState){{ $customerCityState }}@if($customer->pincode) - {{ $customer->pincode }}@endif@endif
+                @if($customerCityState)
+                    {{ $customerCityState }}@if($customer->pincode) - {{ $customer->pincode }}@endif
+                @endif
                 @if($customer->email)<br>{{ $customer->email }}@endif
                 @if($customer->phone)<br>{{ $customer->phone }}@endif
                 @if($customerGstin)<br><span class="gstin-badge">GSTIN: {{ $customerGstin }}</span>@endif
