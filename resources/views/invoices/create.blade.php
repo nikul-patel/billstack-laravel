@@ -4,12 +4,14 @@
     $isEdit = isset($invoice);
     $products = $products ?? collect();
     $productsData = $products->map(function ($product) {
+        $rate = $product->default_rate ?? $product->price ?? 0;
+
         return [
             'id' => $product->id,
             'name' => $product->name,
             'description' => $product->description ?? '',
             'unit' => $product->unit,
-            'rate' => $product->default_rate,
+            'rate' => (float) $rate,
             'tax_rate' => $product->tax_rate,
             'hsn_code' => $product->hsn_code ?? '',
         ];
