@@ -62,6 +62,10 @@ class PaymentController extends Controller
 
     /**
      * Resolve the correct invoice status after a payment change.
+     *
+     * When all payments are removed the status is derived from the due_date
+     * rather than the stale in-memory value (which would still read 'partial'
+     * or 'paid' at call time and could misclassify overdue invoices as 'sent').
      */
     protected function resolveInvoiceStatus(Invoice $invoice): string
     {
@@ -73,8 +77,16 @@ class PaymentController extends Controller
             return 'partial';
         }
 
-        // Keep existing status (sent, draft, overdue, etc.) if nothing paid yet
-        return in_array($invoice->status, ['paid', 'partial']) ? 'sent' : ($invoice->status ?? 'sent');
+        // No payments remain — restore the appropriate unpaid status.
+        // Overdue takes priority: if the due date has passed the invoice is overdue.
+        if ($invoice->due_date && now()->toDateString() > $invoice->due_date) {
+            return 'overdue';
+        }
+
+        // The pre-payment status is no longer available (it was replaced by
+        // 'partial' when the first payment was recorded). Preserve 'draft' or
+        // 'sent' if that is still the current status; otherwise default to 'sent'.
+        return in_array($invoice->status, ['draft', 'sent']) ? $invoice->status : 'sent';
     }
 
     protected function authorizeInvoice(Invoice $invoice): void
