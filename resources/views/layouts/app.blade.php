@@ -464,6 +464,7 @@
             $navLinks = [
                 ['label' => 'Dashboard', 'route' => 'dashboard', 'pattern' => 'dashboard'],
                 ['label' => 'Customers', 'route' => 'customers.index', 'pattern' => 'customers.*'],
+                ['label' => 'Products', 'route' => 'products.index', 'pattern' => 'products.*'],
                 ['label' => 'Items', 'route' => 'items.index', 'pattern' => 'items.*'],
                 ['label' => 'Invoices', 'route' => 'invoices.index', 'pattern' => 'invoices.*'],
                 ['label' => 'Recurring', 'route' => 'recurring-profiles.index', 'pattern' => 'recurring-profiles.*'],

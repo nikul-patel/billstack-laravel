@@ -28,6 +28,7 @@ class Invoice extends Model
         'discount_type',
         'discount_value',
         'tax_total',
+        'tax_amount',
         'round_off',
         'grand_total',
         'amount_paid',

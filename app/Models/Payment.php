@@ -18,6 +18,7 @@ class Payment extends Model
         'amount',
         'paid_at',
         'method',
+        'reference',
         'notes',
     ];
 

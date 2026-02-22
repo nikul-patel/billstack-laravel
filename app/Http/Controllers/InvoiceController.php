@@ -33,10 +33,10 @@ class InvoiceController extends Controller
     {
         $business = $this->requireBusiness();
         $customers = Customer::where('business_id', $business->id)->get();
-
         $items = \App\Models\Item::where('business_id', $business->id)->orderBy('name')->get();
+        $products = \App\Models\Product::where('business_id', $business->id)->where('is_active', true)->orderBy('name')->get();
 
-        return view('invoices.create', compact('customers', 'items'));
+        return view('invoices.create', compact('customers', 'items', 'products'));
     }
 
     /**
@@ -58,6 +58,7 @@ class InvoiceController extends Controller
             'items.*.rate' => ['required_with:items', 'numeric'],
             'items.*.quantity' => ['required_with:items', 'numeric'],
             'items.*.tax_percent' => ['nullable', 'numeric'],
+            'items.*.hsn_code' => ['nullable', 'string', 'max:50'],
             'items.*.sort_order' => ['nullable', 'integer'],
         ]);
 
@@ -67,29 +68,13 @@ class InvoiceController extends Controller
         $data['public_hash'] = Str::random(40);
         $data['created_by'] = Auth::id();
         $invoice = Invoice::create($data);
-        // Create invoice items if provided
-        $subtotal = 0;
-        if ($request->has('items')) {
-            foreach ($request->input('items') as $item) {
-                InvoiceItem::create([
-                    'invoice_id' => $invoice->id,
-                    'item_id' => $item['item_id'] ?? null,
-                    'name' => $item['name'],
-                    'description' => $item['description'] ?? null,
-                    'rate' => $item['rate'],
-                    'quantity' => $item['quantity'],
-                    'tax_percent' => $item['tax_percent'] ?? null,
-                    'tax_amount' => 0,
-                    'line_total' => $item['rate'] * $item['quantity'],
-                    'sort_order' => $item['sort_order'] ?? 0,
-                ]);
-                $subtotal += $item['rate'] * $item['quantity'];
-            }
-        }
-        // update totals
+        // Create invoice items and compute totals
+        [$subtotal, $taxTotal] = $this->syncInvoiceItems($invoice, $request->input('items', []));
         $invoice->subtotal = $subtotal;
-        $invoice->grand_total = $subtotal;
-        $invoice->amount_due = $subtotal;
+        $invoice->tax_total = $taxTotal;
+        $invoice->tax_amount = $taxTotal;
+        $invoice->grand_total = $subtotal + $taxTotal;
+        $invoice->amount_due = $subtotal + $taxTotal;
         $invoice->save();
 
         // increment invoice number
@@ -105,6 +90,7 @@ class InvoiceController extends Controller
     public function show(Invoice $invoice)
     {
         $this->authorizeInvoice($invoice);
+        $invoice->load(['business', 'customer', 'items', 'payments']);
 
         return view('invoices.show', compact('invoice'));
     }
@@ -118,8 +104,9 @@ class InvoiceController extends Controller
         $business = $this->requireBusiness();
         $customers = Customer::where('business_id', $business->id)->get();
         $items = \App\Models\Item::where('business_id', $business->id)->orderBy('name')->get();
+        $products = \App\Models\Product::where('business_id', $business->id)->where('is_active', true)->orderBy('name')->get();
 
-        return view('invoices.create', compact('invoice', 'customers', 'items'));
+        return view('invoices.create', compact('invoice', 'customers', 'items', 'products'));
     }
 
     /**
@@ -141,33 +128,19 @@ class InvoiceController extends Controller
             'items.*.rate' => ['required_with:items', 'numeric'],
             'items.*.quantity' => ['required_with:items', 'numeric'],
             'items.*.tax_percent' => ['nullable', 'numeric'],
+            'items.*.hsn_code' => ['nullable', 'string', 'max:50'],
             'items.*.sort_order' => ['nullable', 'integer'],
         ]);
 
         $invoice->update($data);
-        // update items (simple: delete and recreate)
+        // Update items (delete and recreate)
         $invoice->items()->delete();
-        $subtotal = 0;
-        if ($request->has('items')) {
-            foreach ($request->input('items') as $item) {
-                InvoiceItem::create([
-                    'invoice_id' => $invoice->id,
-                    'item_id' => $item['item_id'] ?? null,
-                    'name' => $item['name'],
-                    'description' => $item['description'] ?? null,
-                    'rate' => $item['rate'],
-                    'quantity' => $item['quantity'],
-                    'tax_percent' => $item['tax_percent'] ?? null,
-                    'tax_amount' => 0,
-                    'line_total' => $item['rate'] * $item['quantity'],
-                    'sort_order' => $item['sort_order'] ?? 0,
-                ]);
-                $subtotal += $item['rate'] * $item['quantity'];
-            }
-        }
+        [$subtotal, $taxTotal] = $this->syncInvoiceItems($invoice, $request->input('items', []));
         $invoice->subtotal = $subtotal;
-        $invoice->grand_total = $subtotal;
-        $invoice->amount_due = $subtotal - $invoice->amount_paid;
+        $invoice->tax_total = $taxTotal;
+        $invoice->tax_amount = $taxTotal;
+        $invoice->grand_total = $subtotal + $taxTotal;
+        $invoice->amount_due = max(0, $subtotal + $taxTotal - ($invoice->amount_paid ?? 0));
         $invoice->save();
 
         return redirect()->route('invoices.show', $invoice)->with('success', 'Invoice updated successfully');
@@ -190,12 +163,8 @@ class InvoiceController extends Controller
     public function downloadPdf(Invoice $invoice)
     {
         $this->authorizeInvoice($invoice);
-        $template = $invoice->template_key ?? $invoice->business->default_template_key ?? 'formal_black';
-        $view = match ($template) {
-            'formal_black' => 'invoices.templates.formal_black',
-            'classic_detailed' => 'invoices.templates.classic_detailed',
-            default => 'invoices.templates.classic_detailed',
-        };
+        $invoice->load(['business', 'customer', 'items', 'payments']);
+        $view = $this->resolveInvoiceView($invoice);
         $pdf = app('dompdf.wrapper')->loadView($view, compact('invoice'));
 
         return $pdf->download("Invoice-{$invoice->invoice_number}.pdf");
@@ -207,15 +176,23 @@ class InvoiceController extends Controller
     public function previewPdf(Invoice $invoice)
     {
         $this->authorizeInvoice($invoice);
-        $template = $invoice->template_key ?? $invoice->business->default_template_key ?? 'formal_black';
-        $view = match ($template) {
-            'formal_black' => 'invoices.templates.formal_black',
-            'classic_detailed' => 'invoices.templates.classic_detailed',
-            default => 'invoices.templates.classic_detailed',
-        };
+        $invoice->load(['business', 'customer', 'items', 'payments']);
+        $view = $this->resolveInvoiceView($invoice);
         $pdf = app('dompdf.wrapper')->loadView($view, compact('invoice'));
 
         return $pdf->stream("Invoice-{$invoice->invoice_number}.pdf", ['Attachment' => false]);
+    }
+
+    /**
+     * Resolve the Blade view for invoice PDF rendering.
+     */
+    protected function resolveInvoiceView(Invoice $invoice): string
+    {
+        return match ($invoice->template_key) {
+            'formal_black' => 'invoices.templates.formal_black',
+            'classic_detailed' => 'invoices.templates.classic_detailed',
+            default => 'invoices.pdf',
+        };
     }
 
     /**
@@ -227,6 +204,37 @@ class InvoiceController extends Controller
 
         // send email logic here
         return redirect()->back()->with('success', 'Email sent successfully');
+    }
+
+    /**
+     * Sync invoice line items and return [subtotal, taxTotal].
+     */
+    protected function syncInvoiceItems(Invoice $invoice, array $items): array
+    {
+        $subtotal = 0;
+        $taxTotal = 0;
+        foreach ($items as $index => $item) {
+            $lineTotal = ($item['rate'] ?? 0) * ($item['quantity'] ?? 1);
+            $taxPercent = (float) ($item['tax_percent'] ?? 0);
+            $taxAmount = round($lineTotal * $taxPercent / 100, 2);
+            InvoiceItem::create([
+                'invoice_id' => $invoice->id,
+                'item_id' => $item['item_id'] ?? null,
+                'name' => $item['name'],
+                'description' => $item['description'] ?? null,
+                'rate' => $item['rate'] ?? 0,
+                'quantity' => $item['quantity'] ?? 1,
+                'tax_percent' => $taxPercent,
+                'tax_amount' => $taxAmount,
+                'hsn_code' => $item['hsn_code'] ?? null,
+                'line_total' => $lineTotal,
+                'sort_order' => $item['sort_order'] ?? $index,
+            ]);
+            $subtotal += $lineTotal;
+            $taxTotal += $taxAmount;
+        }
+
+        return [$subtotal, $taxTotal];
     }
 
     protected function authorizeInvoice(Invoice $invoice): void
