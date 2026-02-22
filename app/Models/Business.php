@@ -15,6 +15,10 @@ class Business extends Model
         'phone',
         'owner_name',
         'gst_number',
+        'gstin',
+        'pan',
+        'default_tax_type',
+        'default_gst_rate',
         'address',
         'address_line_2',
         'city',
@@ -60,5 +64,10 @@ class Business extends Model
     public function payments()
     {
         return $this->hasMany(Payment::class);
+    }
+
+    public function products()
+    {
+        return $this->hasMany(Product::class);
     }
 }
