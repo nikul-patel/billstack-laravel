@@ -4,14 +4,20 @@
     $isEdit = isset($invoice);
     $products = $products ?? collect();
     $productsData = $products->map(function ($product) {
+        $rate = collect([
+            data_get($product, 'default_rate'),
+            data_get($product, 'rate'),
+            data_get($product, 'price'),
+        ])->first(fn ($value) => $value !== null);
+
         return [
-            'id' => $product->id,
-            'name' => $product->name,
-            'description' => $product->description ?? '',
-            'unit' => $product->unit,
-            'rate' => $product->default_rate,
-            'tax_rate' => $product->tax_rate,
-            'hsn_code' => $product->hsn_code ?? '',
+            'id' => data_get($product, 'id'),
+            'name' => data_get($product, 'name', ''),
+            'description' => data_get($product, 'description', ''),
+            'unit' => data_get($product, 'unit', ''),
+            'rate' => (float) ($rate ?? 0),
+            'tax_rate' => data_get($product, 'tax_rate'),
+            'hsn_code' => data_get($product, 'hsn_code', ''),
         ];
     })->values();
 @endphp
