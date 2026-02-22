@@ -86,9 +86,6 @@
                     {{ $customer->city }}<br>
                     {{ $customer->state }}@if($customer->pincode) - {{ $customer->pincode }}@endif
                     <br>
-                    <!-- @if($customer->pincode)
-                        <br>
-                    @endif -->
                 @endif
                 @if($customer->country)
                     {{ $customer->country }}
