@@ -66,4 +66,54 @@ class Invoice extends Model
     {
         return $this->hasMany(Payment::class);
     }
+
+    /**
+     * Calculate the subtotal from stored line item values.
+     *
+     * Uses the immutable line_total stored on each invoice item,
+     * ensuring product price changes don't affect historical invoices.
+     */
+    public function calculateSubtotal(): float
+    {
+        return (float) $this->items()->sum('line_total');
+    }
+
+    /**
+     * Calculate the tax total from stored line item values.
+     *
+     * Uses the immutable tax_amount stored on each invoice item,
+     * ensuring product price changes don't affect historical invoices.
+     */
+    public function calculateTaxTotal(): float
+    {
+        return (float) $this->items()->sum('tax_amount');
+    }
+
+    /**
+     * Calculate the grand total from stored line item values.
+     *
+     * Derives total exclusively from immutable invoice line-item snapshot data.
+     */
+    public function calculateGrandTotal(): float
+    {
+        return $this->calculateSubtotal() + $this->calculateTaxTotal();
+    }
+
+    /**
+     * Recalculate and persist totals from stored line item values.
+     *
+     * This ensures invoice totals are always derived from immutable
+     * line-item snapshot data rather than current product prices.
+     */
+    public function recalculateTotals(): self
+    {
+        $this->subtotal = $this->calculateSubtotal();
+        $this->tax_total = $this->calculateTaxTotal();
+        $this->tax_amount = $this->tax_total;
+        $this->grand_total = $this->calculateGrandTotal();
+        $this->amount_due = max(0, $this->grand_total - ($this->amount_paid ?? 0));
+        $this->save();
+
+        return $this;
+    }
 }
