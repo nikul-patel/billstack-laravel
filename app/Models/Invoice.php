@@ -66,4 +66,71 @@ class Invoice extends Model
     {
         return $this->hasMany(Payment::class);
     }
+
+    /**
+     * Recalculate and persist invoice totals from stored line-item values.
+     *
+     * This method derives subtotal, tax_total, and grand_total exclusively
+     * from the immutable snapshot values stored on InvoiceItem records,
+     * ensuring historical invoices remain unaffected by product price changes.
+     */
+    public function recalculateTotalsFromItems(): self
+    {
+        $this->loadMissing('items');
+
+        $subtotal = 0;
+        $taxTotal = 0;
+
+        foreach ($this->items as $item) {
+            $subtotal += (float) $item->line_total;
+            $taxTotal += (float) $item->tax_amount;
+        }
+
+        $this->subtotal = $subtotal;
+        $this->tax_total = $taxTotal;
+        $this->tax_amount = $taxTotal;
+        $this->grand_total = $subtotal + $taxTotal - (float) ($this->discount_value ?? 0);
+        $this->amount_due = max(0, $this->grand_total - (float) ($this->amount_paid ?? 0));
+
+        return $this;
+    }
+
+    /**
+     * Get the calculated subtotal from stored line items.
+     *
+     * Returns the sum of line_total from all InvoiceItem records,
+     * ensuring totals are derived from immutable snapshot values.
+     */
+    public function getCalculatedSubtotal(): float
+    {
+        $this->loadMissing('items');
+
+        return (float) $this->items->sum('line_total');
+    }
+
+    /**
+     * Get the calculated tax total from stored line items.
+     *
+     * Returns the sum of tax_amount from all InvoiceItem records,
+     * ensuring totals are derived from immutable snapshot values.
+     */
+    public function getCalculatedTaxTotal(): float
+    {
+        $this->loadMissing('items');
+
+        return (float) $this->items->sum('tax_amount');
+    }
+
+    /**
+     * Get the calculated grand total from stored line items.
+     *
+     * Returns subtotal + tax - discount, derived exclusively from
+     * stored InvoiceItem snapshot values.
+     */
+    public function getCalculatedGrandTotal(): float
+    {
+        return $this->getCalculatedSubtotal()
+            + $this->getCalculatedTaxTotal()
+            - (float) ($this->discount_value ?? 0);
+    }
 }

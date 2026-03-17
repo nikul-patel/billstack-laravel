@@ -207,9 +207,10 @@ class RecurringProfileController extends Controller
                 Rule::exists('items', 'id')->where('business_id', $business->id),
             ],
             'items.*.quantity' => ['required', 'numeric', 'gt:0'],
-            'items.*.rate' => ['nullable', 'numeric', 'min:0'],
+            'items.*.rate' => ['required', 'numeric', 'min:0'],
         ], [
             'items.required' => 'Select at least one item to build the invoice.',
+            'items.*.rate.required' => 'Rate is required for each item to ensure invoice totals are captured at creation time.',
         ]);
 
         $itemsCollection = $this->itemsForBusiness($business->id)->keyBy('id');
@@ -220,13 +221,16 @@ class RecurringProfileController extends Controller
             ->map(function ($item, $index) use ($itemsCollection) {
                 $catalogItem = $itemsCollection->get((int) $item['item_id']);
 
-                $rate = $item['rate'] ?? $catalogItem?->price ?? 0;
+                // Use the explicitly provided rate to ensure invoice totals
+                // are captured as immutable snapshots at creation time.
+                // This prevents product price changes from affecting historical invoices.
+                $rate = (float) $item['rate'];
 
                 return [
                     'item_id' => $catalogItem?->id,
                     'name' => $catalogItem?->name,
                     'description' => $catalogItem?->description,
-                    'rate' => (float) $rate,
+                    'rate' => $rate,
                     'quantity' => (float) $item['quantity'],
                     'tax_percent' => $catalogItem?->tax_rate ?? 0,
                     'sort_order' => $index,
